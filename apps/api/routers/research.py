@@ -1,10 +1,11 @@
+import asyncio
+import json
+from typing import AsyncGenerator
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import asyncio
-import json
-from uuid import uuid4
-from typing import AsyncGenerator
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 

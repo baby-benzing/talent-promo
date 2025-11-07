@@ -5,7 +5,7 @@ from main import app
 client = TestClient(app)
 
 
-def test_start_research():
+def test_start_research() -> None:
     """Test starting a research workflow."""
     response = client.post(
         "/api/research/start",
@@ -17,7 +17,7 @@ def test_start_research():
     assert len(data["run_id"]) > 0
 
 
-def test_get_research_status():
+def test_get_research_status() -> None:
     """Test getting research status."""
     # Start a research run first
     start_response = client.post(
@@ -35,13 +35,13 @@ def test_get_research_status():
     assert data["query"] == "test query"
 
 
-def test_get_status_not_found():
+def test_get_status_not_found() -> None:
     """Test getting status for non-existent run."""
     response = client.get("/api/research/status/nonexistent-id")
     assert response.status_code == 404
 
 
-def test_stream_research_status():
+def test_stream_research_status() -> None:
     """Test SSE streaming endpoint."""
     # Start a research run first
     start_response = client.post(

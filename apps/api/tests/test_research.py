@@ -55,3 +55,5 @@ def test_stream_research_status() -> None:
     with client.stream("GET", f"/api/research/stream/{run_id}") as response:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+        # Read at least one chunk to verify streaming works
+        next(response.iter_lines())

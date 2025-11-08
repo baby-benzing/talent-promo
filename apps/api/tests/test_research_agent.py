@@ -1,68 +1,116 @@
-"""Tests for ResearchAgent using Agents SDK."""
+"""Tests for ResearchAgent using Temporal workflows."""
 
 import os
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
-from main import app
-from routers.research_agent import ResearchResult
+# Add project root to Python path to import temporal module
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from pydantic import ValidationError  # noqa: E402
+from temporal.workflows.research_workflow import (  # type: ignore # noqa: E402
+    ResearchResult,
+    ResearchWorkflowResult,
+)
+
+from main import app  # noqa: E402
 
 # Set test environment variables before importing config
 os.environ["OPENAI_API_KEY"] = "sk-test-key-12345"
-os.environ["OPENAI_MODEL"] = "gpt-5-mini"
+os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
 os.environ["LOG_LEVEL"] = "DEBUG"
 
 client = TestClient(app)
 
 
 @pytest.fixture
-def mock_research_result() -> MagicMock:
-    """Create a mock ResearchAgent result."""
-    result = MagicMock()
-    # Mock the final_output_as method to return the ResearchResult
-    output_data = ResearchResult(
+def mock_workflow_result() -> ResearchWorkflowResult:
+    """Create a mock workflow result."""
+    research_result = ResearchResult(
         role_summary="Senior Software Engineer role focusing on backend systems",
         requirements=["5+ years experience", "Python expertise", "System design skills"],
         skills=["Python", "FastAPI", "PostgreSQL", "Docker", "AWS"],
         company_context="Tech startup building B2B SaaS platform",
     )
-    result.final_output_as.return_value = output_data
 
-    # Mock raw_responses with usage information
-    mock_response = MagicMock()
-    mock_usage = MagicMock()
-    mock_usage.input_tokens = 100
-    mock_usage.output_tokens = 150
-    mock_response.usage = mock_usage
-    result.raw_responses = [mock_response]
+    return ResearchWorkflowResult(
+        job_title="Senior Software Engineer",
+        job_url="https://example.com/jobs/123",
+        result=research_result,
+        usage={
+            "prompt_tokens": 100,
+            "completion_tokens": 150,
+            "total_tokens": 250,
+        },
+    )
 
-    return result
 
+def test_research_agent_start_workflow(mock_workflow_result: ResearchWorkflowResult) -> None:
+    """Test starting a research workflow."""
+    with patch("routers.research_agent.get_temporal_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
 
-def test_research_agent_success(mock_research_result: MagicMock) -> None:
-    """Test successful ResearchAgent analysis."""
-    with patch("routers.research_agent.Runner") as mock_runner:
-        # Mock async run method
-        mock_runner.run = AsyncMock(return_value=mock_research_result)
+        # Mock workflow start
+        mock_client.start_workflow = AsyncMock()
 
         response = client.post(
-            "/api/research/analyze",
-            json={"topic": "Senior Software Engineer at TechCorp"},
+            "/api/research-agent/analyze",
+            json={
+                "job_title": "Senior Software Engineer",
+                "job_url": "https://example.com/jobs/123",
+            },
         )
 
         assert response.status_code == 200
         data = response.json()
 
-        # Check structure
+        # Check response structure
         assert "request_id" in data
-        assert "topic" in data
+        assert "workflow_id" in data
+        assert "job_title" in data
+        assert "job_url" in data
+        assert "status" in data
+
+        assert data["status"] == "running"
+        assert data["job_title"] == "Senior Software Engineer"
+        assert data["job_url"] == "https://example.com/jobs/123"
+        assert data["workflow_id"].startswith("research-")
+
+
+def test_research_agent_get_completed_status(
+    mock_workflow_result: ResearchWorkflowResult,
+) -> None:
+    """Test getting status of a completed workflow."""
+    with patch("routers.research_agent.get_temporal_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Mock workflow handle with async result method
+        mock_handle = AsyncMock()
+        mock_handle.result = AsyncMock(return_value=mock_workflow_result)
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        response = client.get("/api/research-agent/status/research-test-123")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check structure
+        assert data["status"] == "completed"
+        assert data["workflow_id"] == "research-test-123"
+        assert data["job_title"] == "Senior Software Engineer"
+        assert data["job_url"] == "https://example.com/jobs/123"
         assert "result" in data
         assert "usage" in data
 
-        # Check result content
+        # Check result content (the actual research output)
         assert "Senior Software Engineer" in data["result"]["role_summary"]
         assert len(data["result"]["requirements"]) == 3
         assert len(data["result"]["skills"]) == 5
@@ -71,44 +119,81 @@ def test_research_agent_success(mock_research_result: MagicMock) -> None:
         # Check usage
         assert data["usage"]["total_tokens"] == 250
 
-        # Verify Runner was called
-        mock_runner.run.assert_called_once()
 
+def test_research_agent_get_running_status() -> None:
+    """Test getting status of a running workflow."""
+    with patch("routers.research_agent.get_temporal_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
 
-def test_research_agent_failure() -> None:
-    """Test that endpoint fails when agent run fails."""
-    with patch("routers.research_agent.Runner") as mock_runner:
-        # Mock async run method with exception
-        mock_runner.run = AsyncMock(side_effect=Exception("Agent error"))
+        # Mock workflow handle that's still running
+        mock_handle = AsyncMock()
+        mock_handle.result = AsyncMock(side_effect=Exception("Not complete yet"))
 
-        response = client.post(
-            "/api/research/analyze",
-            json={"topic": "Test role"},
-        )
+        mock_description = MagicMock()
+        mock_description.status.name = "RUNNING"
+        mock_handle.describe = AsyncMock(return_value=mock_description)
 
-        assert response.status_code == 500
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        response = client.get("/api/research-agent/status/research-test-123")
+
+        assert response.status_code == 200
         data = response.json()
-        assert "Research agent failed" in data["detail"]
+        assert data["status"] == "running"
+        assert data["workflow_id"] == "research-test-123"
 
 
-def test_research_agent_empty_topic() -> None:
-    """Test validation error for empty topic."""
+def test_research_agent_workflow_not_found() -> None:
+    """Test getting status of a non-existent workflow."""
+    with patch("routers.research_agent.get_temporal_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Mock workflow handle that doesn't exist
+        mock_client.get_workflow_handle.side_effect = Exception("Workflow not found")
+
+        response = client.get("/api/research-agent/status/nonexistent-id")
+
+        assert response.status_code == 404
+
+
+def test_research_agent_empty_job_title() -> None:
+    """Test validation error for empty job title."""
     response = client.post(
-        "/api/research/analyze",
-        json={"topic": ""},
+        "/api/research-agent/analyze",
+        json={"job_title": ""},
     )
 
     assert response.status_code == 422  # Validation error
 
 
-def test_research_agent_missing_topic() -> None:
-    """Test validation error for missing topic."""
+def test_research_agent_missing_job_title() -> None:
+    """Test validation error for missing job title."""
     response = client.post(
-        "/api/research/analyze",
+        "/api/research-agent/analyze",
         json={},
     )
 
     assert response.status_code == 422  # Validation error
+
+
+def test_research_agent_without_url() -> None:
+    """Test that job URL is optional."""
+    with patch("routers.research_agent.get_temporal_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+        mock_client.start_workflow = AsyncMock()
+
+        response = client.post(
+            "/api/research-agent/analyze",
+            json={"job_title": "Data Scientist"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["job_title"] == "Data Scientist"
+        assert data["job_url"] is None
 
 
 def test_research_result_schema_validation() -> None:
@@ -139,35 +224,3 @@ def test_research_result_schema_validation() -> None:
             skills=["Skill 1"],
             company_context=None,
         )
-
-
-def test_research_agent_logging(
-    mock_research_result: MagicMock,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Test that proper logging occurs."""
-    import logging
-
-    with caplog.at_level(logging.INFO):
-        with patch("routers.research_agent.Runner") as mock_runner:
-            # Mock async run method
-            mock_runner.run = AsyncMock(return_value=mock_research_result)
-
-            response = client.post(
-                "/api/research/analyze",
-                json={"topic": "Test role"},
-            )
-
-            assert response.status_code == 200
-            data = response.json()
-            request_id = data["request_id"]
-
-            log_messages = [record.message for record in caplog.records]
-
-            # Request ID should appear in logs
-            request_id_logs = [msg for msg in log_messages if request_id in msg]
-            assert len(request_id_logs) > 0
-
-            # ResearchAgent mentions should be in logs
-            agent_logs = [msg for msg in log_messages if "ResearchAgent" in msg]
-            assert len(agent_logs) > 0

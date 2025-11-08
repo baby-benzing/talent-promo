@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import research
+from .routers import research  # type: ignore[import-untyped]
 
 app = FastAPI(
     title="Talent Promo API",

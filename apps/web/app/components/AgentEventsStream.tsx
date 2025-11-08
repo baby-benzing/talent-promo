@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 
+// Get API URL from environment variable with fallback
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 interface AgentEvent {
   agent_id: string;
   type: string;
@@ -29,11 +32,12 @@ export default function AgentEventsStream({
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string>("");
+  const isCompletedRef = useRef<boolean>(false);
 
   useEffect(() => {
     const connectSSE = () => {
       const eventSource = new EventSource(
-        `http://localhost:8000/api/agents/stream/${agentId}`
+        `${API_URL}/api/agents/stream/${agentId}`
       );
       eventSourceRef.current = eventSource;
 
@@ -52,6 +56,7 @@ export default function AgentEventsStream({
             setCurrentPhase(data.phase || null);
           } else if (data.type === "complete") {
             setCurrentPhase("completed");
+            isCompletedRef.current = true;
             eventSource.close();
             onComplete?.();
           }
@@ -69,7 +74,7 @@ export default function AgentEventsStream({
 
         // Reconnect after 3s with backoff
         setTimeout(() => {
-          if (currentPhase !== "completed") {
+          if (!isCompletedRef.current) {
             connectSSE();
           }
         }, 3000);

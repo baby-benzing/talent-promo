@@ -7,10 +7,7 @@ client = TestClient(app)
 
 def test_start_research() -> None:
     """Test starting a research workflow."""
-    response = client.post(
-        "/api/research/start",
-        json={"query": "test research query"}
-    )
+    response = client.post("/api/research/start", json={"query": "test research query"})
     assert response.status_code == 200
     data = response.json()
     assert "run_id" in data
@@ -20,10 +17,7 @@ def test_start_research() -> None:
 def test_get_research_status() -> None:
     """Test getting research status."""
     # Start a research run first
-    start_response = client.post(
-        "/api/research/start",
-        json={"query": "test query"}
-    )
+    start_response = client.post("/api/research/start", json={"query": "test query"})
     run_id = start_response.json()["run_id"]
 
     # Get status
@@ -43,12 +37,14 @@ def test_get_status_not_found() -> None:
 
 def test_stream_research_status() -> None:
     """Test SSE streaming endpoint."""
+    from routers.research import research_runs
+
     # Start a research run first
-    start_response = client.post(
-        "/api/research/start",
-        json={"query": "test query"}
-    )
+    start_response = client.post("/api/research/start", json={"query": "test query"})
     run_id = start_response.json()["run_id"]
+
+    # Mark the run as completed so the stream will terminate
+    research_runs[run_id]["status"] = "completed"
 
     # Test that the stream endpoint is accessible
     # Note: Full SSE testing would require more complex setup
@@ -56,4 +52,5 @@ def test_stream_research_status() -> None:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
         # Read at least one chunk to verify streaming works
-        next(response.iter_lines())
+        chunk = next(response.iter_lines())
+        assert chunk  # Verify we got data

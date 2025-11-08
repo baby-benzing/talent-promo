@@ -80,20 +80,27 @@ async def analyze_role(request: ResearchRequest) -> ResearchResponse:
                 "and company context. Be specific and concise. Focus on actionable details."
             ),
             model=settings.openai_model,
-            response_format=ResearchResult,
+            output_type=ResearchResult,
         )
 
         # Run agent
         result = await Runner.run(agent, request.topic)
 
         # Extract structured output
-        research_output = result.output
+        research_output = result.final_output_as(ResearchResult)
 
-        # Get usage
+        # Extract usage from raw responses
+        total_input_tokens = 0
+        total_output_tokens = 0
+        for response in result.raw_responses:
+            if response.usage:
+                total_input_tokens += response.usage.input_tokens
+                total_output_tokens += response.usage.output_tokens
+
         usage_info = {
-            "prompt_tokens": result.usage.prompt_tokens if result.usage else 0,
-            "completion_tokens": result.usage.completion_tokens if result.usage else 0,
-            "total_tokens": result.usage.total_tokens if result.usage else 0,
+            "prompt_tokens": total_input_tokens,
+            "completion_tokens": total_output_tokens,
+            "total_tokens": total_input_tokens + total_output_tokens,
         }
 
         logger.info(

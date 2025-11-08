@@ -68,10 +68,7 @@ async def stream_research_status(run_id: str) -> StreamingResponse:
                 last_event_idx += 1
 
             # Send status update
-            status_event = {
-                "type": "status",
-                "data": {"status": run["status"], "run_id": run_id}
-            }
+            status_event = {"type": "status", "data": {"status": run["status"], "run_id": run_id}}
             yield f"data: {json.dumps(status_event)}\n\n"
 
             # Stop streaming if research is complete
@@ -112,29 +109,25 @@ async def _simulate_research(run_id: str) -> None:
     await asyncio.sleep(1)
 
     # Add planning event
-    research_runs[run_id]["events"].append({
-        "type": "phase",
-        "data": {"phase": "planning", "message": "Planning research strategy"}
-    })
+    research_runs[run_id]["events"].append(
+        {"type": "phase", "data": {"phase": "planning", "message": "Planning research strategy"}}
+    )
     await asyncio.sleep(2)
 
     # Add searching event
-    research_runs[run_id]["events"].append({
-        "type": "phase",
-        "data": {"phase": "searching", "message": "Searching for information"}
-    })
+    research_runs[run_id]["events"].append(
+        {"type": "phase", "data": {"phase": "searching", "message": "Searching for information"}}
+    )
     await asyncio.sleep(2)
 
     # Add writing event
-    research_runs[run_id]["events"].append({
-        "type": "phase",
-        "data": {"phase": "writing", "message": "Writing research report"}
-    })
+    research_runs[run_id]["events"].append(
+        {"type": "phase", "data": {"phase": "writing", "message": "Writing research report"}}
+    )
     await asyncio.sleep(2)
 
     # Mark as completed
     research_runs[run_id]["status"] = "completed"
-    research_runs[run_id]["events"].append({
-        "type": "complete",
-        "data": {"message": "Research completed successfully"}
-    })
+    research_runs[run_id]["events"].append(
+        {"type": "complete", "data": {"message": "Research completed successfully"}}
+    )

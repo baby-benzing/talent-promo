@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import research  # type: ignore[import-untyped]
+# Note: Using absolute import from routers for compatibility with pytest pythonpath config
+# When running the API, use: cd apps/api && uvicorn main:app --reload
+from routers import research
 
 app = FastAPI(
     title="Talent Promo API",

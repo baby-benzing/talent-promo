@@ -25,12 +25,20 @@ interface ResearchReport {
 // Get API URL from environment variable with fallback
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+interface ReportState {
+  report: ResearchReport | null;
+  loading: boolean;
+  error: string | null;
+}
+
 export default function ResearchReportPage() {
   const params = useParams();
   const runId = params.runId as string;
-  const [report, setReport] = useState<ResearchReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<ReportState>({
+    report: null,
+    loading: true,
+    error: null,
+  });
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -45,16 +53,22 @@ export default function ResearchReportPage() {
 
         // Map API response to ResearchReport interface
         // Note: sections and citations will be added to the API in a future update
-        setReport({
-          runId: data.run_id,
-          query: data.query,
-          status: data.status,
-          sections: data.sections || undefined, // Use API sections if available
+        setState({
+          report: {
+            runId: data.run_id,
+            query: data.query,
+            status: data.status,
+            sections: data.sections || undefined, // Use API sections if available
+          },
+          loading: false,
+          error: null,
         });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load report");
-      } finally {
-        setLoading(false);
+        setState({
+          report: null,
+          loading: false,
+          error: err instanceof Error ? err.message : "Failed to load report",
+        });
       }
     };
 
@@ -65,7 +79,7 @@ export default function ResearchReportPage() {
     navigator.clipboard.writeText(text);
   };
 
-  if (loading) {
+  if (state.loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Loading research report...</div>
@@ -73,10 +87,10 @@ export default function ResearchReportPage() {
     );
   }
 
-  if (error || !report) {
+  if (state.error || !state.report) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg text-red-600">{error || "Report not found"}</div>
+        <div className="text-lg text-red-600">{state.error || "Report not found"}</div>
       </div>
     );
   }
@@ -85,22 +99,22 @@ export default function ResearchReportPage() {
     <div className="mx-auto max-w-4xl p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Research Report</h1>
-        <p className="text-gray-600 mb-1">Query: {report.query}</p>
+        <p className="text-gray-600 mb-1">Query: {state.report.query}</p>
         <p className="text-sm text-gray-500">Run ID: {runId}</p>
         <span
           className={`inline-block mt-2 px-3 py-1 rounded-full text-sm ${
-            report.status === "completed"
+            state.report.status === "completed"
               ? "bg-green-100 text-green-800"
               : "bg-yellow-100 text-yellow-800"
           }`}
         >
-          {report.status}
+          {state.report.status}
         </span>
       </div>
 
       <div className="space-y-8">
-        {report.sections && report.sections.length > 0 ? (
-          report.sections.map((section, idx) => (
+        {state.report.sections && state.report.sections.length > 0 ? (
+          state.report.sections.map((section, idx) => (
             <section key={idx} className="border-l-4 border-blue-500 pl-6">
               <h2 className="text-2xl font-semibold mb-4">{section.title}</h2>
               <p className="text-gray-700 mb-4 leading-relaxed">
@@ -144,7 +158,7 @@ export default function ResearchReportPage() {
         ) : (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
             <p className="text-gray-700">
-              Research report sections are not yet available. The research workflow is {report.status}.
+              Research report sections are not yet available. The research workflow is {state.report.status}.
             </p>
             <p className="text-sm text-gray-500 mt-2">
               Detailed sections and citations will be added when the research completes.

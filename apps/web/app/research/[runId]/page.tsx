@@ -18,9 +18,12 @@ interface Citation {
 interface ResearchReport {
   runId: string;
   query: string;
-  sections: ResearchSection[];
+  sections?: ResearchSection[];
   status: string;
 }
+
+// Get API URL from environment variable with fallback
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ResearchReportPage() {
   const params = useParams();
@@ -33,47 +36,20 @@ export default function ResearchReportPage() {
     const fetchReport = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8000/api/research/status/${runId}`
+          `${API_URL}/api/research/status/${runId}`
         );
         if (!response.ok) {
           throw new Error("Research run not found");
         }
         const data = await response.json();
 
-        // Mock research report data (would come from actual API)
+        // Map API response to ResearchReport interface
+        // Note: sections and citations will be added to the API in a future update
         setReport({
           runId: data.run_id,
           query: data.query,
           status: data.status,
-          sections: [
-            {
-              title: "Overview",
-              content: "This section provides an overview of the research findings.",
-              citations: [
-                {
-                  id: "1",
-                  url: "https://example.com/source1",
-                  title: "Source 1"
-                }
-              ]
-            },
-            {
-              title: "Key Findings",
-              content: "Here are the key findings from the research.",
-              citations: [
-                {
-                  id: "2",
-                  url: "https://example.com/source2",
-                  title: "Source 2"
-                },
-                {
-                  id: "3",
-                  url: "https://example.com/source3",
-                  title: "Source 3"
-                }
-              ]
-            }
-          ]
+          sections: data.sections || undefined, // Use API sections if available
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load report");
@@ -123,47 +99,58 @@ export default function ResearchReportPage() {
       </div>
 
       <div className="space-y-8">
-        {report.sections.map((section, idx) => (
-          <section key={idx} className="border-l-4 border-blue-500 pl-6">
-            <h2 className="text-2xl font-semibold mb-4">{section.title}</h2>
-            <p className="text-gray-700 mb-4 leading-relaxed">
-              {section.content}
-            </p>
+        {report.sections && report.sections.length > 0 ? (
+          report.sections.map((section, idx) => (
+            <section key={idx} className="border-l-4 border-blue-500 pl-6">
+              <h2 className="text-2xl font-semibold mb-4">{section.title}</h2>
+              <p className="text-gray-700 mb-4 leading-relaxed">
+                {section.content}
+              </p>
 
-            {section.citations.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">
-                  Citations
-                </h3>
-                <div className="space-y-2">
-                  {section.citations.map((citation) => (
-                    <div
-                      key={citation.id}
-                      className="flex items-center justify-between bg-gray-50 p-3 rounded"
-                    >
-                      <div className="flex-1">
-                        <a
-                          href={citation.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          [{citation.id}] {citation.title}
-                        </a>
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(citation.url)}
-                        className="ml-4 px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
+              {section.citations.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    Citations
+                  </h3>
+                  <div className="space-y-2">
+                    {section.citations.map((citation) => (
+                      <div
+                        key={citation.id}
+                        className="flex items-center justify-between bg-gray-50 p-3 rounded"
                       >
-                        Copy
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex-1">
+                          <a
+                            href={citation.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            [{citation.id}] {citation.title}
+                          </a>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(citation.url)}
+                          className="ml-4 px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </section>
-        ))}
+              )}
+            </section>
+          ))
+        ) : (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <p className="text-gray-700">
+              Research report sections are not yet available. The research workflow is {report.status}.
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Detailed sections and citations will be added when the research completes.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

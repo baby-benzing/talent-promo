@@ -5,3 +5,4 @@ pydantic-settings==2.3.4
 python-multipart==0.0.9
 temporalio==1.6.0
 openai==1.35.3
+openai-agents==0.5.0

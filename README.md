@@ -24,22 +24,59 @@ talent-promo/
 
 ### Development
 
-Install dependencies:
+#### Backend Setup (Python)
+
+1. Create virtual environment:
+
+```bash
+cd apps/api
+python3 -m venv venv
+```
+
+2. Activate virtual environment:
+
+```bash
+# macOS/Linux
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+```
+
+3. Install dependencies (in the `apps/api` directory):
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Set environment variables:
+
+```bash
+export OPENAI_API_KEY=sk-your-key-here
+```
+
+5. Run the API server:
+
+```bash
+uvicorn main:app --reload
+```
+
+The API will be available at `http://localhost:8000`
+
+To deactivate the virtual environment when done:
+
+```bash
+deactivate
+```
+
+#### Frontend Setup (Node.js)
 
 ```bash
 pnpm install
-cd apps/api && pip install -r requirements.txt
-```
-
-Run development servers:
-
-```bash
-# Frontend
 pnpm --filter web dev
-
-# Backend
-cd apps/api && uvicorn main:app --reload
 ```
+
+The web app will be available at `http://localhost:3000`
 
 ## Tech Stack
 

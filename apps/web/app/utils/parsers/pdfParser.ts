@@ -19,14 +19,14 @@ export async function parsePDF(file: File): Promise<PDFParseResult> {
   }
 
   try {
-    // Dynamic import to avoid SSR issues
-    const pdfjsLib = await import('pdfjs-dist');
+    // Dynamic import to avoid SSR issues - use legacy build for better compatibility
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
     // Set worker path after loading
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
 
     const pageCount = pdf.numPages;
     const textPages: string[] = [];

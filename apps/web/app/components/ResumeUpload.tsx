@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, DragEvent } from "react";
-import { parseResumeFile } from "@/app/utils/parsers/resumeParser";
 import { saveResume } from "@/app/utils/storage/resumeStorage";
 import type { ParsedResume } from "@/app/types/resume";
 import ResumeViewer from "./ResumeViewer";
@@ -101,13 +100,35 @@ export default function ResumeUpload() {
     try {
       // Simulate progress
       const progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 15, 90));
+        setProgress((prev) => Math.min(prev + 15, 70));
       }, 200);
 
-      // Parse the resume
-      const resume = await parseResumeFile(file);
+      // Step 1: Parse the document using backend API
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const parseResponse = await fetch("http://localhost:8000/documents/parse", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!parseResponse.ok) {
+        throw new Error(`Server error: ${parseResponse.status}`);
+      }
+
+      const parseResult = await parseResponse.json();
+
+      if (!parseResult.success) {
+        throw new Error(parseResult.error || "Failed to parse document");
+      }
 
       clearInterval(progressInterval);
+      setProgress(80);
+
+      // Step 2: Parse the text into structured resume data
+      const { parseResumeText } = await import("@/app/utils/parsers/resumeTextParser");
+      const resume = parseResumeText(parseResult.text, file.name, file.size, file.type);
+
       setProgress(95);
 
       // Save to storage

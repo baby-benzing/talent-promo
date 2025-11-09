@@ -92,8 +92,11 @@ def test_research_agent_get_completed_status(
         mock_client = AsyncMock()
         mock_get_client.return_value = mock_client
 
-        # Mock workflow handle with async result method
+        # Mock workflow handle with describe showing COMPLETED status
         mock_handle = AsyncMock()
+        mock_description = MagicMock()
+        mock_description.status.name = "COMPLETED"
+        mock_handle.describe = AsyncMock(return_value=mock_description)
         mock_handle.result = AsyncMock(return_value=mock_workflow_result)
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
 
@@ -128,8 +131,6 @@ def test_research_agent_get_running_status() -> None:
 
         # Mock workflow handle that's still running
         mock_handle = AsyncMock()
-        mock_handle.result = AsyncMock(side_effect=Exception("Not complete yet"))
-
         mock_description = MagicMock()
         mock_description.status.name = "RUNNING"
         mock_handle.describe = AsyncMock(return_value=mock_description)

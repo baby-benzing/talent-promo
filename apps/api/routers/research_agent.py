@@ -165,50 +165,57 @@ async def get_workflow_status(workflow_id: str) -> ResearchStatusResponse:
         # Get workflow handle
         handle = client.get_workflow_handle(workflow_id)
 
-        # Try to get the result (non-blocking check)
-        try:
-            # Check if workflow is complete
-            result = await handle.result()
+        # Check workflow status without blocking
+        description = await handle.describe()
+        status_name = description.status.name if description.status else "UNKNOWN"
 
-            logger.info(f"[{request_id}] Workflow completed successfully")
+        if status_name == "COMPLETED":
+            # Workflow completed - fetch the result
+            try:
+                result = await handle.result()
+                logger.info(f"[{request_id}] Workflow completed successfully")
 
+                return ResearchStatusResponse(
+                    request_id=request_id,
+                    workflow_id=workflow_id,
+                    job_title=result.job_title,
+                    job_url=result.job_url,
+                    status="completed",
+                    result=result.result,
+                    usage=result.usage,
+                )
+            except Exception as e:
+                # Result fetch failed, but workflow says completed
+                logger.error(f"[{request_id}] Failed to fetch completed workflow result: {str(e)}")
+                return ResearchStatusResponse(
+                    request_id=request_id,
+                    workflow_id=workflow_id,
+                    job_title="[Completed]",
+                    job_url=None,
+                    status="completed",
+                    error=f"Failed to retrieve result: {str(e)}",
+                )
+
+        elif status_name == "RUNNING":
+            # Workflow is still running - return immediately
             return ResearchStatusResponse(
                 request_id=request_id,
                 workflow_id=workflow_id,
-                job_title=result.job_title,
-                job_url=result.job_url,
-                status="completed",
-                result=result.result,
-                usage=result.usage,
+                job_title="[In Progress]",
+                job_url=None,
+                status="running",
             )
 
-        except Exception:
-            # Workflow is still running or failed
-            # Check workflow status through describe
-            description = await handle.describe()
-
-            status_name = description.status.name if description.status else "UNKNOWN"
-
-            if status_name == "RUNNING":
-                # For running workflows, we need to fetch the input from workflow
-                # For now, return placeholder - in production, use Temporal search attributes
-                return ResearchStatusResponse(
-                    request_id=request_id,
-                    workflow_id=workflow_id,
-                    job_title="[In Progress]",
-                    job_url=None,
-                    status="running",
-                )
-            else:
-                # Workflow failed - try to get input from workflow history
-                return ResearchStatusResponse(
-                    request_id=request_id,
-                    workflow_id=workflow_id,
-                    job_title="[Failed]",
-                    job_url=None,
-                    status="failed",
-                    error=f"Workflow status: {status_name}",
-                )
+        else:
+            # Workflow failed or in another state
+            return ResearchStatusResponse(
+                request_id=request_id,
+                workflow_id=workflow_id,
+                job_title="[Failed]",
+                job_url=None,
+                status="failed",
+                error=f"Workflow status: {status_name}",
+            )
 
     except Exception as e:
         logger.error(f"[{request_id}] Failed to get workflow status: {str(e)}")

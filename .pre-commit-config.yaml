@@ -21,12 +21,12 @@ repos:
 
   # ESLint for frontend (if needed)
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.57.1
+    rev: v9.15.0
     hooks:
       - id: eslint
         files: ^apps/web/
         types: [file]
         types_or: [javascript, jsx, ts, tsx]
         additional_dependencies:
-          - eslint@8.57.1
+          - eslint@9.15.0
           - eslint-config-next

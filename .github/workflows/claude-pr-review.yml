@@ -1,0 +1,141 @@
+name: Claude PR Review
+on:
+  # Trigger on new PRs and updates
+  pull_request:
+    types: [opened, synchronize]
+  
+  # Trigger when someone comments on PR
+  issue_comment:
+    types: [created]
+  
+  # Trigger on PR review comments
+  pull_request_review_comment:
+    types: [created]
+  
+  # Trigger on PR reviews
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  pr-review:
+    if: |
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.pull_request && 
+       contains(github.event.comment.body, '@claude review')) ||
+      (github.event_name == 'pull_request_review_comment' && 
+       contains(github.event.comment.body, '@claude review')) ||
+      (github.event_name == 'pull_request' && 
+       contains(github.event.pull_request.body, '@claude review'))
+   
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    
+    steps:
+      - name: Get PR number
+        id: pr
+        run: |
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request_review_comment" ]]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better diff analysis
+          
+      - name: Fetch PR target branch
+        run: |
+          git fetch origin pull/${{ steps.pr.outputs.number }}/head:pr-branch
+          git fetch origin ${{ github.base_ref || 'main' }}:base-branch
+          
+      - name: Generate PR context
+        id: pr-context
+        run: |
+          # Get PR diff
+          echo "## Pull Request #${{ steps.pr.outputs.number }} Diff" > pr-context.md
+          echo '```diff' >> pr-context.md
+          git diff base-branch..pr-branch >> pr-context.md
+          echo '```' >> pr-context.md
+          
+          # Get list of changed files
+          echo "## Changed Files" >> pr-context.md
+          git diff --name-status base-branch..pr-branch >> pr-context.md
+          
+          # Get PR metadata using GitHub API
+          echo "## PR Information" >> pr-context.md
+          curl -s -H "Authorization: token ${{ github.token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ steps.pr.outputs.number }}" | \
+            jq -r '"Title: \(.title)\nDescription: \(.body // "No description")\nBase: \(.base.ref)\nHead: \(.head.ref)"' >> pr-context.md
+          
+          # Save the diff for Claude to access
+          git diff base-branch..pr-branch > pr.diff
+          
+      - name: Run Claude PR Review
+        uses: anthropics/claude-code-action@v1
+        id: claude-review
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --model opus
+            --max-turns 15
+            --allowedTools "Bash(git *),Bash(cat *),Bash(ls *),Bash(grep *),Bash(find *),Bash(head *),Bash(tail *)"
+            --system-prompt "You are reviewing pull request #${{ steps.pr.outputs.number }} in the ${{ github.repository }} repository.
+            
+            First, examine the PR context by reading:
+            1. cat pr-context.md - This contains the PR metadata and overview
+            2. cat pr.diff - This contains the actual code changes
+            
+            Then review the changes focusing on:
+            1. Code quality and best practices
+            2. Potential bugs or logic errors
+            3. Security vulnerabilities
+            4. Performance implications
+            5. Test coverage adequacy
+            6. Documentation completeness
+            7. Breaking changes or compatibility issues
+            
+            Provide specific, actionable feedback with:
+            - File names and line numbers for specific issues
+            - Clear explanations of problems found
+            - Concrete suggestions for improvements
+            - Recognition of good practices (be very concise)
+            
+            Format your response as a professional PR review comment.
+            Start with a very brief summary, then detailed feedback organized by file or concern.
+            End with an overall recommendation (approve, request changes, or needs discussion)."
+            
+      - name: Post review comment
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `${{ steps.claude-review.outputs.response }}`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr.outputs.number }},
+              body: `## 🤖 Claude PR Review\n\n${review}\n\n---\n*Triggered by @claude review mention*`
+            });
+            
+      - name: Add reaction to trigger comment
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ github.event.comment.id }},
+              content: 'eyes'
+            });

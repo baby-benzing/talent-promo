@@ -2,12 +2,12 @@
 Job scraper service for retrieving job postings from various platforms
 """
 
-from typing import Dict, Optional
-from urllib.parse import urlparse
-import logging
-from datetime import datetime
-import re
 import asyncio
+import logging
+import re
+from datetime import datetime
+from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -16,7 +16,7 @@ from cachetools import TTLCache
 logger = logging.getLogger(__name__)
 
 # Cache for storing recently fetched jobs (1 hour TTL, max 100 items)
-job_cache = TTLCache(maxsize=100, ttl=3600)
+job_cache: TTLCache[str, Dict[str, Any]] = TTLCache(maxsize=100, ttl=3600)
 
 
 class ScraperError(Exception):
@@ -27,13 +27,13 @@ class ScraperError(Exception):
 class JobScraper:
     """Main job scraper class that coordinates platform-specific scrapers"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         }
         self.timeout = 10
 
-    async def fetch_job(self, url: str) -> Dict:
+    async def fetch_job(self, url: str) -> Dict[str, Any]:
         """
         Fetch and parse a job posting from a URL
 
@@ -595,8 +595,8 @@ class JobScraper:
         if not requirements:
             experience_pattern = r'(?:^|\n)\s*([^\n]*\d+\+?\s*years?[^\n]*)'
             matches = re.findall(experience_pattern, text, re.IGNORECASE | re.MULTILINE)
-            for match in matches[:5]:  # Limit to 5
-                item = match.strip()
+            for match_str in matches[:5]:  # Limit to 5
+                item = match_str.strip()
                 if 10 < len(item) < 500:
                     requirements.append({
                         "text": item,
@@ -686,6 +686,6 @@ class JobScraper:
 
     def _generate_id(self) -> str:
         """Generate a unique ID"""
-        from datetime import datetime
         import random
+        from datetime import datetime
         return f"job-{int(datetime.now().timestamp())}-{random.randint(1000, 9999)}"

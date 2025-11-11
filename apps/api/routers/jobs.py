@@ -2,19 +2,20 @@
 Job posting retrieval router
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
-from typing import List, Optional
 import logging
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, HttpUrl
 
 # Add services directory to path
 services_path = Path(__file__).parent.parent / "services"
 if str(services_path) not in sys.path:
     sys.path.insert(0, str(services_path))
 
-from job_scraper import JobScraper, ScraperError
+from job_scraper import JobScraper, ScraperError  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class BatchJobResponse(BaseModel):
 
 
 @router.post("/fetch", response_model=JobResponse)
-async def fetch_job(request: FetchJobRequest):
+async def fetch_job(request: FetchJobRequest) -> JobResponse:
     """
     Fetch and parse a single job posting from a URL
 
@@ -86,7 +87,7 @@ async def fetch_job(request: FetchJobRequest):
 
 
 @router.post("/batch", response_model=BatchJobResponse)
-async def batch_fetch_jobs(request: BatchFetchRequest):
+async def batch_fetch_jobs(request: BatchFetchRequest) -> BatchJobResponse:
     """
     Fetch multiple job postings in batch
 
@@ -147,6 +148,6 @@ async def batch_fetch_jobs(request: BatchFetchRequest):
 
 
 @router.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """Health check endpoint for job scraper service"""
     return {"status": "healthy", "service": "job-scraper"}

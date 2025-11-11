@@ -327,7 +327,7 @@ export default function JobURLInput() {
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>How it works:</strong> Enter a job posting URL from supported platforms.
-              We'll extract and structure the job data including title, company, requirements,
+              We&apos;ll extract and structure the job data including title, company, requirements,
               salary, and more. Use batch mode to process multiple URLs at once.
             </p>
           </div>

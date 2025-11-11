@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Note: Using absolute import from routers for compatibility with pytest pythonpath config
 # When running the API, use: cd apps/api && uvicorn main:app --reload
-from routers import agents, research, research_agent, jobs, documents  # noqa: E402
+from routers import agents, documents, jobs, research, research_agent  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

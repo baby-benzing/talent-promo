@@ -2,19 +2,20 @@
 Document parsing router
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel
-from typing import Optional
 import logging
 import sys
 from pathlib import Path
+from typing import Dict, Optional
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
 
 # Add services directory to path
 services_path = Path(__file__).parent.parent / "services"
 if str(services_path) not in sys.path:
     sys.path.insert(0, str(services_path))
 
-from document_parser import DocumentParser, DocumentParserError
+from document_parser import DocumentParser, DocumentParserError  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class ParseResponse(BaseModel):
 
 
 @router.post("/parse", response_model=ParseResponse)
-async def parse_document(file: UploadFile = File(...)):
+async def parse_document(file: UploadFile = File(...)) -> ParseResponse:
     """
     Parse a PDF or DOCX document and extract text
 
@@ -106,6 +107,6 @@ async def parse_document(file: UploadFile = File(...)):
 
 
 @router.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """Health check endpoint for document parser service"""
     return {"status": "healthy", "service": "document-parser"}

@@ -2,24 +2,24 @@
 Document parser service for parsing PDF and DOCX files
 """
 
-from typing import Dict
 import io
 import logging
+from typing import Dict
 
 try:
     from PyPDF2 import PdfReader
 except ImportError:
-    PdfReader = None
+    PdfReader = None  # type: ignore
 
 try:
     import pdfplumber
 except ImportError:
-    pdfplumber = None
+    pdfplumber = None  # type: ignore
 
 try:
     from docx import Document
 except ImportError:
-    Document = None
+    Document = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class DocumentParser:
                 logger.warning(f"pdfplumber failed, falling back to PyPDF2: {str(e)}")
 
         # Fallback to PyPDF2
-        if not PdfReader:
+        if not PdfReader:  # type: ignore
             raise DocumentParserError("PDF parsing libraries not installed")
 
         try:
@@ -75,7 +75,7 @@ class DocumentParser:
             reader = PdfReader(pdf_file)
 
             text_pages = []
-            for page in reader.pages:
+            for page in reader.pages:  # type: ignore
                 # Extract text with layout mode for better structure
                 text = page.extract_text(extraction_mode="layout")
                 if text:
@@ -114,7 +114,7 @@ class DocumentParser:
         Raises:
             DocumentParserError: If parsing fails
         """
-        if not Document:
+        if not Document:  # type: ignore
             raise DocumentParserError("python-docx is not installed")
 
         try:

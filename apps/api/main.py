@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Note: Using absolute import from routers for compatibility with pytest pythonpath config
 # When running the API, use: cd apps/api && uvicorn main:app --reload
-from routers import agents, research, research_agent  # noqa: E402
+from routers import agents, documents, jobs, research, research_agent  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,19 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:3004",
+        "http://localhost:3005",
+        "http://localhost:3006",
+        "http://localhost:3007",
+        "http://localhost:3008",
+        "http://localhost:3009",
+        "http://localhost:3010",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,6 +73,8 @@ app.add_middleware(
 app.include_router(agents.router)
 app.include_router(research.router)
 app.include_router(research_agent.router)
+app.include_router(jobs.router)
+app.include_router(documents.router)
 
 
 @app.get("/")
